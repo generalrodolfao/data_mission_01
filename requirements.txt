@@ -1,3 +1,6 @@
 apscheduler
 requests
 python-dotenv
+dbt-duckdb
+streamlit
+pandas

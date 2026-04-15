@@ -1,0 +1,9 @@
+data_mission_profile:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: '../data_mission.duckdb'
+      extensions:
+        - httpfs
+        - json

@@ -1,8 +1,30 @@
 import os
 import requests
 import json
+import subprocess
 from datetime import datetime
 from config import API_BASE_URL, DOWNLOADS_DIR, METADATA_FILE
+
+def run_dbt():
+    """
+    Executes dbt run to process the downloaded data.
+    """
+    dbt_path = os.path.join(os.getcwd(), "dbt_project")
+    try:
+        print("Starting dbt run...")
+        # Using full path to dbt inside the venv if possible, or assuming it's in PATH
+        result = subprocess.run(
+            ["dbt", "run", "--profiles-dir", "."],
+            cwd=dbt_path,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            print("dbt run completed successfully.")
+        else:
+            print(f"dbt run failed: {result.stderr}")
+    except Exception as e:
+        print(f"Error executing dbt: {e}")
 
 def download_dataset(project_id: str, format: str = "json"):
     """
@@ -31,6 +53,9 @@ def download_dataset(project_id: str, format: str = "json"):
         # Register metadata
         log_metadata(project_id, format, len(response.content), filepath)
         print(f"Successfully downloaded dataset for project {project_id} to {filepath}")
+        
+        # Run dbt after successful ingestion
+        run_dbt()
         
     except Exception as e:
         print(f"Error downloading dataset for project {project_id}: {e}")
