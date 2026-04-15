@@ -21,6 +21,9 @@ def download_dataset(project_id: str, format: str = "json"):
         response = requests.get(url, params={"format": format}, timeout=30)
         response.raise_for_status()
         
+        # Ensure directory exists before writing
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        
         # Save the content
         with open(filepath, "wb") as f:
             f.write(response.content)
@@ -47,6 +50,9 @@ def log_metadata(project_id: str, format: str, size: int, filepath: str | None, 
         "error": error,
         "status": "success" if error is None else "failed"
     }
+    
+    # Ensure logs directory exists
+    os.makedirs(os.path.dirname(METADATA_FILE), exist_ok=True)
     
     # Append metadata to a JSONL file
     with open(METADATA_FILE, "a") as f:
