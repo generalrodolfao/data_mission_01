@@ -1,17 +1,17 @@
-{% macro get_delivery_priority(deadline, current_time) %}
+{% macro get_delivery_priority(deadline_col, current_time_expr='now()') %}
     case
-        when {{ deadline }} < {{ current_time }} then 'CRITICAL'
-        when datediff('hour', {{ current_time }}, {{ deadline }}) <= 2 then 'HIGH'
-        when datediff('hour', {{ current_time }}, {{ deadline }}) <= 5 then 'MEDIUM'
+        when {{ deadline_col }} < {{ current_time_expr }} then 'CRITICAL'
+        when datediff('hour', {{ current_time_expr }}, {{ deadline_col }}) <= 2 then 'HIGH'
+        when datediff('hour', {{ current_time_expr }}, {{ deadline_col }}) <= 5 then 'MEDIUM'
         else 'LOW'
     end
 {% endmacro %}
 
-{% macro get_delivery_status(delivered_at, deadline) %}
+{% macro get_delivery_status(delivered_at_col, deadline_col, current_time_expr='now()') %}
     case
-        when {{ delivered_at }} is not null and {{ delivered_at }} <= {{ deadline }} then 'DELIVERED_ON_TIME'
-        when {{ delivered_at }} is not null and {{ delivered_at }} > {{ deadline }} then 'DELIVERED_LATE'
-        when {{ delivered_at }} is null and now() > {{ deadline }} then 'OVERDUE'
+        when {{ delivered_at_col }} is not null and {{ delivered_at_col }} <= {{ deadline_col }} then 'DELIVERED_ON_TIME'
+        when {{ delivered_at_col }} is not null and {{ delivered_at_col }} > {{ deadline_col }} then 'DELIVERED_LATE'
+        when {{ delivered_at_col }} is null and {{ current_time_expr }} > {{ deadline_col }} then 'OVERDUE'
         else 'PENDING'
     end
 {% endmacro %}
