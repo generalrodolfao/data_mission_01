@@ -27,39 +27,77 @@ st.title("🚚 Painel de Monitoramento de Entregas")
 df = load_data()
 
 if df is not None and not df.empty:
-    # Key Metrics
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total de Entregas", len(df))
-    with col2:
-        st.metric("Atrasos Críticos", len(df[df['priority'] == 'CRITICAL']))
-    with col3:
-        st.metric("Entregas no Prazo", len(df[df['status'] == 'DELIVERED_ON_TIME']))
-    with col4:
-        avg_delay = df['delay_minutes'].mean()
-        st.metric("Atraso Médio (min)", f"{avg_delay:.1f}" if not pd.isna(avg_delay) else "0")
-
-    # Data Table
-    st.subheader("📋 Lista de Entregas")
+    # Sidebar Filters
+    st.sidebar.header("Filtros")
+    status_options = sorted(df['status'].unique().tolist())
+    status_filter = st.sidebar.multiselect("Status", options=status_options, default=status_options)
     
-    # Filtering
-    status_filter = st.multiselect("Filtrar por Status", options=df['status'].unique(), default=df['status'].unique())
-    priority_filter = st.multiselect("Filtrar por Prioridade", options=df['priority'].unique(), default=df['priority'].unique())
+    priority_options = sorted(df['priority'].unique().tolist())
+    priority_filter = st.sidebar.multiselect("Prioridade", options=priority_options, default=priority_options)
     
     filtered_df = df[(df['status'].isin(status_filter)) & (df['priority'].isin(priority_filter))]
-    
-    st.dataframe(filtered_df, use_container_width=True)
 
-    # Charts
+    # 1. Main Metrics
+    st.subheader("📊 Métricas Principais")
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.metric("Total de Entregas", len(filtered_df))
+    with m2:
+        critical_count = len(filtered_df[filtered_df['priority'] == 'CRITICAL'])
+        st.metric("Prioridade Crítica", critical_count, delta=f"{critical_count} alertas", delta_color="inverse")
+    with m3:
+        overdue_count = len(filtered_df[filtered_df['status'] == 'OVERDUE'])
+        st.metric("Atrasos (Overdue)", overdue_count, delta=f"{overdue_count} pendentes", delta_color="inverse")
+    with m4:
+        avg_delay = filtered_df[filtered_df['delay_minutes'] > 0]['delay_minutes'].mean()
+        st.metric("Atraso Médio (min)", f"{avg_delay:.1f}" if not pd.isna(avg_delay) else "0")
+
+    # 2. Alerts Section
+    st.divider()
+    st.subheader("⚠️ Alertas Pendentes")
+    alerts_df = filtered_df[
+        (filtered_df['priority'].isin(['CRITICAL', 'HIGH'])) & 
+        (filtered_df['status'].isin(['OVERDUE', 'PENDING']))
+    ][['delivery_id', 'priority', 'status', 'deadline', 'origin', 'destination']]
+    
+    if not alerts_df.empty:
+        st.warning(f"Existem {len(alerts_df)} entregas de alta prioridade que requerem atenção!")
+        st.dataframe(alerts_df, use_container_width=True, hide_index=True)
+    else:
+        st.success("Nenhum alerta crítico pendente.")
+
+    # 3. Route Performance
+    st.divider()
+    st.subheader("🗺️ Indicadores por Rota")
+    
+    # Group by origin-destination
+    route_metrics = filtered_df.groupby(['origin', 'destination']).agg(
+        total_entregas=('delivery_id', 'count'),
+        media_atraso=('delay_minutes', 'mean'),
+        taxa_atraso=('status', lambda x: (x == 'DELIVERED_LATE').sum() / len(x) * 100)
+    ).reset_index()
+    
+    route_metrics['rota'] = route_metrics['origin'] + " ➔ " + route_metrics['destination']
+    st.dataframe(route_metrics[['rota', 'total_entregas', 'media_atraso', 'taxa_atraso']], 
+                 use_container_width=True, hide_index=True)
+
+    # 4. Visualizations
+    st.divider()
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("Distribuição por Prioridade")
-        st.bar_chart(df['priority'].value_counts())
+        st.bar_chart(filtered_df['priority'].value_counts())
     with c2:
         st.subheader("Status das Entregas")
-        st.bar_chart(df['status'].value_counts())
+        st.bar_chart(filtered_df['status'].value_counts())
 
 else:
-    st.info("Nenhum dado disponível. Aguarde o primeiro job de sincronização ou verifique se o dbt já rodou.")
-    if st.button("Tentar recarregar"):
+    st.info("Nenhum dado disponível. O banco DuckDB ainda não contém a tabela 'fct_deliveries'.")
+    st.markdown("""
+    ### Próximos Passos:
+    1. Inicie o agendador: `python main.py`
+    2. Aguarde o primeiro download e a execução do dbt.
+    3. Atualize esta página.
+    """)
+    if st.button("🔄 Tentar Recarregar"):
         st.rerun()
